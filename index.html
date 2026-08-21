@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#03050a">
+<title>Galactic Corkscrew — Solar System Helix Simulator</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    background: #03050a;
+    color: #e0e6f0;
+    font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+    -webkit-text-size-adjust: 100%;
+    touch-action: none;
+  }
+
+  body {
+    min-height: 100dvh;
+    position: fixed;
+    inset: 0;
+  }
+
+  canvas {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  canvas:active {
+    cursor: grabbing;
+  }
+
+  #ui {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    width: min(300px, calc(100vw - 24px));
+    background: rgba(8, 12, 22, 0.88);
+    border: 1px solid rgba(80, 140, 255, 0.28);
+    border-radius: 14px;
+    padding: 14px 16px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 10;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    touch-action: manipulation;
+  }
+
+  #ui h1 {
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: 0.4px;
+    margin-bottom: 4px;
+    color: #7eb8ff;
+  }
+
+  #ui p {
+    font-size: 11px;
+    opacity: 0.72;
+    margin-bottom: 12px;
+    line-height: 1.4;
+  }
+
+  .control {
+    display: grid;
+    grid-template-columns: 1fr 128px;
+    gap: 12px;
+    align-items: center;
+    margin: 9px 0;
+    font-size: 12px;
+  }
+
+  .control label {
+    opacity: 0.97;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    min-height: 30px;
+    accent-color: #4a9eff;
+    touch-action: pan-x;
+  }
+
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  button {
+    min-height: 38px;
+    background: rgba(74,158,255,0.15);
+    border: 1px solid rgba(74,158,255,0.42);
+    color: #a8d0ff;
+    padding: 7px 13px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.05s;
+    touch-action: manipulation;
+  }
+
+  button:hover {
+    background: rgba(74,158,255,0.3);
+    border-color: #4a9eff;
+  }
+
+  button:active {
+    transform: scale(0.98);
+  }
+
+  #legend {
+    position: fixed;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    left: max(14px, env(safe-area-inset-left));
+    z-index: 88;
+    font-size: 11px;
+    opacity: 0.68;
+    line-height: 1.65;
+    pointer-events: none;
+    text-shadow: 0 1px 4px #000;
+  }
+
+  .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+
+  .mobile-hint {
+    display: none;
+  }
+
+  @media (max-width: 700px), (max-height: 640px) {
+    #ui {
+      width: min(94vw, 330px);
+      padding: 11px 12px;
+      max-height: 48dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    #ui h1 {
+      font-size: 14px;
+    }
+
+    #ui p {
+      font-size: 10px;
+      margin-bottom: 8px;
+    }
+
+    .control {
+      grid-template-columns: 1fr minmax(120px, 46vw);
+      margin: 5px 0;
+      gap: 8px;
+    }
+
+    button {
+      flex: 1 1 110px;
+      min-height: 42px;
+      font-size: 13px;
+    }
+
+    #legend {
+      font-size: 10px;
+      bottom: max(8px, env(safe-area-inset-bottom));
+    }
+
+    .desktop-hint {
+      display: none;
+    }
+
+    .mobile-hint {
+      display: block;
+    }
+  }
+</style>
+</head>
+
+<body>
+
+<canvas id="c" aria-label="Interactive solar system helix simulator"></canvas>
+
+<div id="ui">
+  <h1>Galactic Corkscrew</h1>
+  <p>
+    Solar system following the Sun through the galaxy. Planets leave helical trails as the whole system advances.
+  </p>
+
+  <div class="control">
+    <label for="speed">Speed</label>
+    <input type="range" id="speed" min="0.2" max="4" step="0.1" value="1.2">
+  </div>
+
+  <div class="control">
+    <label for="trail">Trail Length</label>
+    <input type="range" id="trail" min="50" max="600" step="10" value="280">
+  </div>
+
+  <div class="control">
+    <label for="zoom">Zoom</label>
+    <input type="range" id="zoom" min="0.35" max="3" step="0.05" value="1">
+  </div>
+
+  <div class="control">
+    <label for="persp">Perspective</label>
+    <input type="range" id="persp" min="0.3" max="1.8" step="0.05" value="1">
+  </div>
+
+  <div class="buttons">
+    <button id="reset" type="button">Reset View</button>
+    <button id="pause" type="button">Pause</button>
+  </div>
+</div>
+
+<div id="legend">
+  <div><span class="dot" style="background:#ffcc33"></span>Sun</div>
+  <div><span class="dot" style="background:#4a9eff"></span>Earth</div>
+  <div><span class="dot" style="background:#aaa"></span>Other planets</div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  if (!ctx) {
+    document.body.innerHTML = '<p style="padding:20px">This browser does not support HTML5 Canvas.</p>';
+    return;
+  }
+
+  const speedInput = document.getElementById('speed');
+  const trailInput = document.getElementById('trail');
+  const zoomInput = document.getElementById('zoom');
+  const perspInput = document.getElementById('persp');
+  const resetButton = document.getElementById('reset');
+  const pauseButton = document.getElementById('pause');
+
+  let W = 0;
+  let H = 0;
+  let CX = 0;
+  let CY = 0;
+  let dpr = 1;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    CX = W / 2;
+    CY = H / 2;
+
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  window.addEventListener('resize', resize, { passive: true });
+  window.addEventListener('orientationchange', () => setTimeout(resize, 120), { passive: true });
+  resize();
+
+  const planets = [
+    { name: 'Mercury', dist: 28, radius: 2.2, period: 0.24, color: '#b0b0b0', trail: [] },
+    { name: 'Venus', dist: 42, radius: 3.4, period: 0.62, color: '#e8cda0', trail: [] },
+    { name: 'Earth', dist: 58, radius: 3.8, period: 1.0, color: '#4a9eff', trail: [], highlight: true },
+    { name: 'Mars', dist: 78, radius: 2.8, period: 1.88, color: '#e07050', trail: [] },
+    { name: 'Jupiter', dist: 130, radius: 7.5, period: 11.9, color: '#d4a574', trail: [] },
+    { name: 'Saturn', dist: 175, radius: 6.2, period: 29.5, color: '#e8d5a3', trail: [] }
+  ];
+
+  let t = 0;
+  let speed = 1.2;
+  let trailLen = 280;
+  let zoom = 1.0;
+  let persp = 1.0;
+  let paused = false;
+
+  let rotY = 0.55;
+  let rotX = -0.35;
+  let autoRotate = true;
+
+  const pointers = new Map();
+  let lastSingle = null;
+  let lastPinchDistance = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function updateZoom(value) {
+    zoom = clamp(value, 0.35, 3.0);
+    zoomInput.value = zoom.toFixed(2);
+  }
+
+  function pointerDistance() {
+    const pts = Array.from(pointers.values());
+    if (pts.length < 2) return null;
+    return Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    canvas.setPointerCapture?.(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    autoRotate = false;
+
+    if (pointers.size === 1) {
+      lastSingle = { x: e.clientX, y: e.clientY };
+      lastPinchDistance = null;
+    } else if (pointers.size === 2) {
+      lastPinchDistance = pointerDistance();
+      if (lastPinchDistance && lastSingle) {
+        // start pinch; keep lastSingle for relative drag
+        lastSingle = null;
+      }
+    }
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 1 && lastSingle) {
+      const dx = e.clientX - lastSingle.x;
+      const dy = e.clientY - lastSingle.y;
+      rotX += dx * 0.005;
+      rotY = clamp(rotY + dy * 0.005, 0.15, 1.4);
+      lastSingle = { x: e.clientX, y: e.clientY };
+      return;
+    }
+
+    if (pointers.size >= 2) {
+      const distance = pointerDistance();
+      if (distance && lastPinchDistance) {
+        const dist = distance - lastPinchDistance;
+        rotX += dist * 0.005;
+        rotY = clamp(rotY + (distance - lastPinchDistance) * 0.0005, 0.15, 1.4);
+        updateZoom(zoom + (distance - lastPinchDistance) * 0.0005);
+        lastPinchDistance = distance;
+      }
+      lastPinchDistance = distance;
+    }
+  });
+
+  canvas.addEventListener('pointerup', (e) => {
+    pointers.delete(e.pointerId);
+
+    if (pointers.size === 1) {
+      const remaining = Array.from(pointers.values())[0];
+      lastSingle = { x: remaining.x, y: remaining.y };
+      lastPinchDistance = null;
+    }
+  });
+
+  canvas.addEventListener('pointercancel', () => {
+    pointers.clear();
+    lastSingle = null;
+    lastPinchDistance = null;
+  });
+
+  window.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      pointers.clear();
+      lastSingle = null;
+      lastPinchDistance = null;
+    }
+  });
+
+  function project(x, y, z) {
+    const cosX = Math.cos(rotX);
+    const sinX = Math.sin(rotX);
+    const cosY = Math.cos(rotY);
+    const sinY = Math.sin(rotY);
+
+    const x1 = x * cosX - z * sinX;
+    const z1 = x * sinX + z * cosX;
+    const y1 = y * cosY - z1 * sinY;
+    const z2 = y * sinY + z1 * cosY;
+
+    const denominator = Math.max(40, 280 + z2 * persp);
+    const scale = (280 * zoom) / denominator;
+
+    return {
+      x: CX + x1 * scale,
+      y: CY + y1 * scale,
+      s: scale,
+      depth: z2
+    };
+  }
+
+  function drawLine(points, strokeStyle, lineWidth, minDepth, maxDepth) {
+    ctx.beginPath();
+    let started = false;
+
+    for (let i = points.length - 1; i >= 0; i--) {
+      const p = points[i];
+      if (typeof p.x !== 'number' || typeof p.y !== 'number') continue;
+      if (p.depth < minDepth || p.depth > maxDepth) continue;
+      if (!started) {
+        ctx.moveTo(p.x, p.y);
+        started = true;
+      } else {
+        ctx.lineTo(p.x, p.y);
+      }
+    }
+
+    if (started) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = 'rgba(3, 5, 10, 0.25)';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = 'rgba(180, 200, 255, 0.35)';
+    for (let i = 0; i < 80; i++) {
+      const sx = (Math.sin(i * 12.3 + rotX) * 0.5 + 0.5) * W;
+      const sy = (Math.cos(i * 7.7 + rotY) * 0.5 + 0.5) * H;
+      const sr = (i % 3) * 0.4 + 0.4;
+      ctx.beginPath();
+      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (!paused) {
+      t += 0.018 * speed;
+      if (autoRotate) rotX += 0.00012;
+    }
+
+    const sunZ = t * 38;
+    const sunTrail = [];
+
+    drawLine(sunTrail, 'rgba(255, 200, 80, 0.15)', 2, -400, 650);
+
+    const drawList = [];
+    const sunP = project(0, 0, 0);
+    drawList.push({ p: sunP, r: 11, name: 'Sun', color: '#ffcc44', trail: sunTrail });
+
+    planets.forEach((pl) => {
+      if (pl.trail == null) return;
+      const angle = (t / pl.period) * Math.PI * 2;
+      const px = Math.cos(angle) * pl.dist;
+      const py = Math.sin(angle) * pl.dist;
+      const pz = Math.sin(angle * 0.5) * pl.dist * 0.5 * H;
+
+      const proj = project(px, py, pz);
+      pl.trail.push(proj);
+      while (pl.trail.length > trailLen) pl.trail.shift();
+
+      drawList.push({ p: proj, r: pl.radius, name: pl.name, color: pl.color, trail: pl.trail, highlight: Boolean(pl.highlight) });
+    });
+
+    // sort by depth
+    drawList.sort((a, b) => b.p.depth - a.p.depth);
+
+    drawList.forEach((item) => {
+      const p = item.p;
+      if (item.trail && item.trail.length) {
+        drawLine(item.trail, item.color, 2, -450, 650);
+      }
+
+      ctx.beginPath();
+      ctx.fillStyle = item.color;
+      ctx.arc(p.x, p.y, Math.max(1, item.r * (p.s * 0.5)), 0, Math.PI * 2);
+      ctx.fill();
+
+      if (item.highlight) {
+        ctx.strokeStyle = 'rgba(120, 200, 255, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    });
+
+    ctx.fillStyle = '#ffc4';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillText('Solar system corkscrewing through the galaxy', 20, H - 20);
+  }
+
+  requestAnimationFrame(draw);
+
+  function visibilitychange() {
+    if (document.hidden) {
+      pointers.clear();
+      lastSingle = null;
+      lastPinchDistance = null;
+    }
+  }
+
+  draw();
+})();
+</script>
+
+</body>
+</html>
